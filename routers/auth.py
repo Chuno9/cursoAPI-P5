@@ -30,7 +30,7 @@ class SolicitudUsuario(BaseModel):
     rol:str
 
 class Token(BaseModel):
-    acces_token:str
+    access_token:str
     token_type:str
 
 def obtenerDB():
@@ -50,9 +50,9 @@ def autenticacion_usuario(nombreUsu:str, contraseña:str, db):
         return False
     return usuario
 
-def crear_token(nombreUsu:str, id_usu:int,expires_delta:timedelta):
+def crear_token(nombreUsu:str, id_usu:int, rol:str, expires_delta:timedelta):
 
-    encode = {"sub": nombreUsu, "id": id_usu}
+    encode = {"sub": nombreUsu, "id": id_usu, "rol": rol}
     expires=datetime.now(timezone.utc) + expires_delta
     encode.update({"exp":expires})
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -62,9 +62,10 @@ async def obtener_usuario(token: Annotated[str, Depends(oauth2_bearer)]):
         payload=jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         nombreUsu: str = payload.get("sub")
         id_usu: int = payload.get("id")
+        rol_usu:str = payload.get("rol")
         if nombreUsu is None or id_usu is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No tienes acceso a estos recursos")
-        return{"nombreUsu": nombreUsu, "id": id_usu} 
+        return{"nombreUsu": nombreUsu, "id": id_usu, "rol": rol_usu} 
     except:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No tienes acceso a estos recursos")
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -82,9 +83,9 @@ async def crear_usuario(db: db_dependency, usuario :SolicitudUsuario):
     db.commit()
 
 @router.post("/token", response_model=Token)
-async def acces_token(form_data : Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency):
+async def access_token(form_data : Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency):
     usuario= autenticacion_usuario(form_data.username, form_data.password, db)
     if not usuario:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No tienes acceso a estos recursos")
-    token= crear_token(usuario.nombreUsu, usuario.id, timedelta(minutes=20))
-    return {"access_token": token, "token_type": "bearer"}
+    access_token= crear_token(usuario.nombreUsu, usuario.id, usuario.rol, timedelta(minutes=20))
+    return {"access_token": access_token, "token_type": "bearer"}

@@ -5,6 +5,7 @@ from starlette import status
 from pydantic import BaseModel, Field
 from models import Todos
 from database import SessionLocal
+from .auth import obtener_usuario
 router = APIRouter()
 
 def obtenerDB():
@@ -15,6 +16,7 @@ def obtenerDB():
         db.close()
 
 db_dependency=Annotated[Session, Depends(obtenerDB)]
+user_dependency=Annotated[dict, Depends(obtener_usuario)]
 
 class SolicitudTodo(BaseModel):
     titulo:str=Field(min_length=3)
@@ -23,26 +25,34 @@ class SolicitudTodo(BaseModel):
     completada:bool
 
 @router.get("/", status_code=status.HTTP_200_OK)
-async def leerDatos(db: db_dependency):
-    return db.query(Todos).all()
+async def leerDatos(usuario: user_dependency, db: db_dependency):
+    if usuario is None:
+        raise HTTPException(status_code=401, detail="Autenticacion fallida")
+    return db.query(Todos).filter(Todos.dueño_id==usuario.get("id")).all()
 
 @router.get("/todo/{todo_id}", status_code=status.HTTP_200_OK)
-async def datosPorId(db: db_dependency, todo_id: int=Path(gt=0)):
-    todo_model=db.query(Todos).filter(Todos.id==todo_id).first()
+async def datosPorId(usuario:user_dependency, db: db_dependency, todo_id: int=Path(gt=0)):
+    if usuario is None:
+        raise HTTPException(status_code=401, detail="Autenticacion fallida")
+    todo_model=db.query(Todos).filter(Todos.id==todo_id).filter(Todos.dueño_id==usuario.get("id")).first()
     if todo_model is not None:
         return todo_model
     raise HTTPException(status_code=404, detail="No encontrado")
 
 @router.post("/todo", status_code=status.HTTP_201_CREATED)
-async def crearTodo(db:db_dependency, solicitud:SolicitudTodo):
-    todo_model=Todos(**solicitud.dict())
+async def crear_Todo(usuario:user_dependency, db:db_dependency, solicitud:SolicitudTodo):
+    if usuario is None:
+        raise HTTPException(status_code=401, detail="Autenticacion fallida")
+    todo_model=Todos(**solicitud.dict(), dueño_id=usuario.get("id"))
 
     db.add(todo_model)
     db.commit()
 
 @router.put("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def actualizarTodo(db: db_dependency, solicitud:SolicitudTodo, todo_id:int=Path(gt=0)):
-    todo_model=db.query(Todos).filter(Todos.id==todo_id).first()
+async def actualizarTodo(usuario: user_dependency, db: db_dependency, solicitud:SolicitudTodo, todo_id:int=Path(gt=0)):
+    if usuario is None:
+        raise HTTPException(status_code=401, detail="Autenticacion fallida")
+    todo_model=db.query(Todos).filter(Todos.id==todo_id).filter(Todos.dueño_id==usuario.get("id")).first()
     if todo_model is None:
         raise HTTPException(status_code=404, details="no se encuentra la tarea")
     todo_model.titulo=solicitud.titulo
@@ -53,8 +63,10 @@ async def actualizarTodo(db: db_dependency, solicitud:SolicitudTodo, todo_id:int
     db.commit()
     
 @router.delete("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def borrarTodo(db: db_dependency, todo_id:int = Path(gt=0)):
-    todo_model=db.query(Todos).filter(Todos.id==todo_id).first()
+async def borrarTodo(usuario: user_dependency, db: db_dependency, todo_id:int = Path(gt=0)):
+    if usuario is None:
+        raise HTTPException(status_code=401, detail="Autenticacion fallida")
+    todo_model=db.query(Todos).filter(Todos.id==todo_id).filter(Todos.dueño_id==usuario.get("id")).first()
     if todo_model is None:
         raise HTTPException(status_code=404, detail="no se encuentra la tarea")
     db.query(Todos).filter(Todos.id==todo_id).delete()
