@@ -6,4 +6,4 @@ RUN apt update -y && apt install curl -y
 
 RUN pip install -r requirements.txt 
 
-ENTRYPOINT ["pytest"]
+CMD ["pytest"]
