@@ -1,17 +1,24 @@
 version: "3"
 services:
-  db_tests:
+  db_final:
     build:
       context: .
       dockerfile: Dockerfile.postgres
     ports:
       - 5432:5432
-  app_tests:
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/pgdata
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=manu
+      - POSTGRES_PASSWORD=1234
+      - PGDATA=/var/lib/postgresql/data/pgdata
+  app_final:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - 8000:8000
     restart: on-failure
-
-    
+volumes:
+  postgres_data:

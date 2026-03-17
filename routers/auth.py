@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from sqlalchemy.orm import Session
-from fastapi import FastAPI, Depends, HTTPException, Path, APIRouter
+from fastapi import FastAPI, Depends, HTTPException, Path, APIRouter, Request
 from starlette import status
 from pydantic import BaseModel, Field
 from database import SessionLocal
@@ -9,6 +9,7 @@ from models import Usuarios
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
+from fastapi.templating import Jinja2Templates
 
 router=APIRouter(
     prefix="/auth",
@@ -26,7 +27,7 @@ class SolicitudUsuario(BaseModel):
     email:str
     nombre:str
     apellido:str
-    contraseña:str
+    password:str
     rol:str
     tel:str
 
@@ -42,6 +43,19 @@ def obtenerDB():
         db.close()
 
 db_dependency=Annotated[Session, Depends(obtenerDB)]
+
+templates = Jinja2Templates(directory="templates/")
+
+### páginas ###
+
+@router.get("/login-page")
+def login_page(request:Request):
+    return templates.TemplateResponse("login.html",{"request": request})
+
+@router.get("/register-page")
+def login_page(request:Request):
+    return templates.TemplateResponse("register.html",{"request": request})
+### Endpoints ###
 
 def autenticacion_usuario(nombre_usu:str, contraseña:str, db):
     usuario=db.query(Usuarios).filter(Usuarios.nombre_usu == nombre_usu).first()
@@ -69,14 +83,14 @@ async def obtener_usuario(token: Annotated[str, Depends(oauth2_bearer)]):
         return{"nombre_usu": nombre_usu, "id": id_usu, "rol": rol_usu} 
     except:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No tienes acceso a estos recursos")
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def crear_usuario(db: db_dependency, usuario :SolicitudUsuario):
     usuario=Usuarios(
         email=usuario.email,
         nombre_usu=usuario.nombre_usu,
         nombre=usuario.nombre,
         apellido=usuario.apellido,
-        hash_password=bcrypt_context.hash(usuario.contraseña),
+        hash_password=bcrypt_context.hash(usuario.password),
         rol=usuario.rol,
         tel=usuario.tel,
         activo=True

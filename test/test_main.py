@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
-import main2
+import main3
 from fastapi import status
 
-client=TestClient(main2.app)
+client=TestClient(main3.app)
 
 def test_health():
     response=client.get("/healthy")
